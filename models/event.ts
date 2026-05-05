@@ -16,7 +16,7 @@ export interface IEvent extends Document {
     startDate: Date
     endDate?: Date
     capacity?: number
-    category?: string
+    category: Types.ObjectId // Reference to Category
     attendeesCount: number
     imgId?:  string
     imgUrl?: string
@@ -45,7 +45,10 @@ const eventSchema = new Schema<IEvent>({
     startDate: Date, // Date of the event
     endDate: Date,
     capacity: { type: Number, min: 1 }, // max no. of attendees allowed
-    category: { type: String, enum: ['Social', 'Tech', 'Fitness', 'Music', 'Sports', 'Business', 'Education'] },
+    category: {
+        type: Schema.Types.ObjectId, ref: 'Category', // must match your category model name
+        required: true
+    },
     isCancelled: { type: Boolean, default: false },
     imgId: String,
     imgUrl: String,

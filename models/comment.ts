@@ -3,20 +3,21 @@ import mongoose, { Schema, Document, Types } from 'mongoose'
 
 // Interface for Comment document
 export interface IComment extends Document {
-    eventId: Types.ObjectId // Reference to Event
-    userId: Types.ObjectId // Reference to User
+    event: Types.ObjectId // Reference to Event
+    user: Types.ObjectId // Reference to User
     text: string
+    parentComment?: Types.ObjectId // Reference to Comment
     editedAt?: Date
     createdAt: Date
     updatedAt: Date
 }
 const commentSchema = new Schema<IComment>({
-    eventId: {
+    event: {
         type: Schema.Types.ObjectId,
         ref: 'Event', // Links the comment to an Event
         required: true
     },
-    userId: {
+    user: {
         type: Schema.Types.ObjectId,
         ref: 'User', // Links the comment to the User who posted it
         required: true
@@ -27,14 +28,20 @@ const commentSchema = new Schema<IComment>({
         trim: true,
         maxlength: 500 // Limit the comment size
     },
+    parentComment: {
+        type: Schema.Types.ObjectId,
+        ref: 'Comment', // For nested comments (replies)
+        default: null
+    },
     editedAt: {
         type: Date
     }
 }, { timestamps: true, collection: 'comments' })
 
-// Prevent duplicate attendance
-commentSchema.index({ userId: 1 })
-commentSchema.index({ eventId: 1 })
+// Performance indexes
+commentSchema.index({ user: 1 })
+commentSchema.index({ event: 1, createdAt: -1})
+commentSchema.index({ parentComment: 1 })
 
 const Comment = mongoose.model<IComment>('Comment', commentSchema)
 export default Comment
