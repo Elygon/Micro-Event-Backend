@@ -175,7 +175,7 @@ router.post('/login', async (req: Request, res: Response) => {
         const token = jwt.sign({
             _id: user._id,
             email: user.email
-        }, process.env.JWT_SECRET as string, { expiresIn: '1d' })
+        }, process.env.jwt_secret as string, { expiresIn: '1d' })
 
         //update user document to online
         user = await User.findOneAndUpdate({ _id: user._id }, { is_online: true }, { new: true }).lean()
@@ -276,7 +276,7 @@ router.post('/forgot_password', async (req: Request, res: Response) => {
         // Create reset token (expires in 10 min)
         const resetToken = jwt.sign(
             { _id: user._id },
-            process.env.JWT_SECRET as string,
+            process.env.jwt_secret as string,
             { expiresIn: '10m' }
         );
 

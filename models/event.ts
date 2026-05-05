@@ -8,17 +8,20 @@ interface IPoint {
 
 // Interface for Event document
 export interface IEvent extends Document {
-    title?: string
-    description?: string
+    title: string
+    description: string
     organizer: Types.ObjectId // Reference to User
     location: IPoint
-    address?: string
-    date?: Date
-    duration?: number
+    address: string
+    startDate: Date
+    endDate?: Date
     capacity?: number
-    category?: 'Social' | 'Tech' | 'Fitness'
-    status?: 'upcoming' | 'ongoing' | 'completed' | 'cancelled'
-    attendeesCount?: number
+    category?: string
+    attendeesCount: number
+    imgId?:  string
+    imgUrl?: string
+    isPublic: boolean
+    isCancelled: boolean
     createdAt: Date
     updatedAt: Date
 }
@@ -38,12 +41,15 @@ const eventSchema = new Schema<IEvent>({
         required: true
     }, // user that created the event
     location: { type: pointSchema, required: true },
-    address: String,  // 09057675129
-    date: Date, // Date of the event
-    duration: Number, // e.g minutes
-    capacity: Number, // max no. of attendees allowed
-    category: { type: String, enum: ['Social', 'Tech', 'Fitness'] },
-    status: { type: String, enum: ['upcoming', 'ongoing', 'completed', 'cancelled'] },
+    address: String,
+    startDate: Date, // Date of the event
+    endDate: Date,
+    capacity: { type: Number, min: 1 }, // max no. of attendees allowed
+    category: { type: String, enum: ['Social', 'Tech', 'Fitness', 'Music', 'Sports', 'Business', 'Education'] },
+    isCancelled: { type: Boolean, default: false },
+    imgId: String,
+    imgUrl: String,
+    isPublic: { type: Boolean, default: true },
     attendeesCount: { type: Number, default: 0 }
 }, { timestamps: true, collection: 'events' })
 

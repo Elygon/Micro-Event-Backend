@@ -1,18 +1,5 @@
 import mongoose, { Schema, Document, Model } from 'mongoose'
 
-// // Define a GeoJSON Point schema
-// const pointSchema = new Schema({
-//     type: {
-//         type: String, enum: ['Point'], // Must be 'Point'
-//         required: true, default: 'Point'
-//     },
-//     coordinates: {
-//         type: [Number], // [longitude, latitude]
-//         required: true
-//     }
-// })
-
-
 // Define a TypeScript interface
 export interface IUser extends Document {
     firstname?: string
@@ -24,7 +11,11 @@ export interface IUser extends Document {
     profile_img_id?: string
     profile_img_url?: string
     bio?: String //Short description
-    interests?: 'Tech' | 'Music' | 'Sports'
+    interests?: string[]
+    location?: {
+        type: 'Point',
+        coordinates: [number, number] // [longitude, latitude]
+    }
     createdAt: Date
     updatedAt: Date
 }
@@ -40,18 +31,25 @@ const userSchema: Schema<IUser> = new Schema({
     profile_img_id: { type: String, default: '' },
     profile_img_url: { type: String, default: '' },
     bio: String, //Short description
-    // location: {
-    //     type: pointSchema, // Embedded GeoJSON Point
-    //     default: { type: 'Point', coordinates: [0, 0] } // Default coordinates
-    // },
-    interests: {
+    location: {
+        type: {
+            type: String, // Embedded GeoJSON Point
+            enum: ['Point'],
+            default: 'Point'
+        }, 
+        coordinates: {
+            type: [Number], // [longitude, latitude]
+            default: [0, 0] // Default coordinates
+        }
+    },
+    interests: [{
         type: String,
-        enum: [ 'Tech', 'Music', 'Sports']
-    }
+        enum: [ 'Tech', 'Music', 'Sports', 'Hanging', 'Fitness', 'Gaming']
+    }]
 }, { timestamps: true, collection: 'users' })
 
 // Query nearby locations
-//userSchema.index({ location: '2dsphere' });
+userSchema.index({ location: '2dsphere' });
 
 const User: Model<IUser> = mongoose.model<IUser>('User', userSchema)
 export default User
