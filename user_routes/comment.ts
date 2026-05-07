@@ -27,7 +27,7 @@ router.post('/comment', token, async(req: Request, res: Response) => {
             return res.status(400).send({ status: 'error', msg: 'Cannot comment on cancelled event'})
         }
 
-        const comment = await Comment.create({ event: eventId, user: (req as any).user._id, text})
+        const comment = await Comment.create({ event: eventId, user: (req as any).user._id, text: text.trim() })
 
         return res.status(201).send({ status: 'ok', msg: 'success', comment })
 
@@ -58,10 +58,17 @@ router.post('/reply', token, async(req: Request, res: Response) => {
         }
 
         // Check if parent comment exists
-        const parentComment = await Comment.findById(parentCommentId)
+        const parentComment: any = await Comment.findById(parentCommentId)
 
         if ( !parentComment ) {
             return res.status(404).send({ status: 'error', msg: 'Parent comment not found'})
+        }
+
+        // Ensure parent comment belongs to same event
+        if (parentComment.event.toString() !== eventId) {
+            return res.status(400).send({
+                status: 'error', msg: 'Parent comment does not belong to this event'
+            })
         }
 
         // Prevent replies on cancelled events
@@ -70,7 +77,7 @@ router.post('/reply', token, async(req: Request, res: Response) => {
         }
 
         const reply = await Comment.create({ 
-            event: eventId, user: (req as any).user._id, text, parentComment: parentCommentId 
+            event: eventId, user: (req as any).user._id, text: text.trim(), parentComment: parentCommentId 
         })
 
         return res.status(201).send({ status: 'ok', msg: 'success', reply })
@@ -152,7 +159,7 @@ router.post('/update', token, async(req: Request, res: Response) => {
             return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
         }
 
-        comment.text = text
+        comment.text = text.trim()
         comment.editedAt = new Date()
 
         await comment.save()
