@@ -34,6 +34,12 @@ app.use('/event', event)
 import savedEvent from './user_routes/savedEvent'
 app.use('/saved_event', savedEvent)
 
+import attendance from './user_routes/attendance'
+app.use('/attendance', attendance)
+
+import comment from './user_routes/comment'
+app.use('/comment', comment)
+
 // server
 const port = process.env.PORT || 4600
 app.listen(port, () => {
