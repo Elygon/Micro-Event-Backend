@@ -4,7 +4,7 @@ const router = express.Router()
 import Attendance from '../models/attendance'
 import token from '../middleware/userToken'
 import Event from '../models/event'
-import User from '../models/user'
+//import User from '../models/user'
 
 // ======================== ATTEND AN EVENT ========================
 router.post('/attend', token, async(req: Request, res: Response) => {
@@ -93,11 +93,21 @@ router.post('/update', token, async(req: Request, res: Response) => {
             return res.status(404).send({ status: 'error', msg: 'Attendance record not found' })
         }
 
+        // Prevent updating to the same status
+        if (attendance.status === status) {
+            return res.status(400).send({ status: 'error', msg: 'Attendance status already set' })
+        }
+
         // Capacity enforcement
         if ( attendance.status !== 'going' && 
             status === 'going' && event.capacity && event.attendeesCount >= event.capacity
         ) {
             return res.status(400).send({ status: 'error', msg: 'Event is already at full capacity' })
+        }
+
+        // Increment attendees count
+        if ( attendance.status !== 'going' && status === 'going' ) {
+            event.attendeesCount += 1
         }
 
         // Decrement attendees count
@@ -141,9 +151,12 @@ router.post('/remove', token, async(req: Request, res: Response) => {
 
         // Decrement attendees count
         if (attendance.status === 'going') {
-            await Event.findByIdAndUpdate(eventId, {
-                $inc: { attendeesCount: -1 }
-            })
+            const event: any = await Event.findById(eventId)
+
+            if (event && event.attendeesCount > 0) {
+                event.attendeesCount -= 1
+                await event.save()
+            }
         }
 
         await attendance.deleteOne()
@@ -169,7 +182,7 @@ router.post('/attendees', token, async(req: Request, res: Response) => {
             return res.status(400).send({ status: 'error', msg: 'Event ID is required' })
         }
 
-        const attendees = await Attendance.find({ event: eventId })
+        const attendees = await Attendance.find({ event: eventId, status: 'going' })
         .populate('user').sort({ createdAt: -1 })
 
         return res.status(200).send({ status: 'ok', msg: 'success', attendees })
