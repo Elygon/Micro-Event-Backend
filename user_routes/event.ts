@@ -28,6 +28,10 @@ router.post('/create', multer.single('image'), token, async (req: Request, res: 
             title, description, address, startDate, endDate, capacity, category, isPublic, lng, lat 
         } = req.body as CreateEventBody
 
+        if (!title || !description || !address || !category || lng === undefined || lat === undefined) {
+            return res.status(400).send({ status: 'error', msg: 'Missing required fields' })
+        }
+
         let imgId = ''
         let imgUrl = ''
 
@@ -50,7 +54,7 @@ router.post('/create', multer.single('image'), token, async (req: Request, res: 
             capacity,
             category,
             isPublic,
-            organizer: (req as any).user_id,
+            organizer: (req as any).user._id,
             location: {
                 type: 'Point',
                 coordinates: [Number(lng), Number(lat)]
@@ -88,7 +92,7 @@ router.post('/nearby', token, async (req: Request, res: Response) => {
     try {
         const { lng, lat, radius = 5000 } = req.body as { lng: number, lat: number, radius: number }
 
-        if (!lng || !lat) {
+        if (lng === undefined || lat === undefined) {
             return res.status(400).send({ status: 'error', msg: 'longitude and latitude are required' })
         }
 
@@ -115,7 +119,9 @@ router.post('/nearby', token, async (req: Request, res: Response) => {
 // ======================== GET SINGLE EVENT ========================
 router.post('/single', token, async (req: Request, res: Response) => {
     try {
-        const event = await Event.findById((req as any).user._id).populate('category').populate('organizer')
+        const { eventId } = req.body
+        
+        const event = await Event.findById(eventId).populate('category').populate('organizer')
 
         if (!event) {
             return res.status(404).send({ status: 'error', msg: 'Event not found' })
@@ -128,18 +134,153 @@ router.post('/single', token, async (req: Request, res: Response) => {
 })
 
 
+// ======================== MY EVENTS ========================
+router.post('/my_events', token, async(req: Request, res: Response) => {
+    try {
+        const events = await Event.find({ organizer: (req as any).user._id })
+        .populate('category').populate('organizer').sort({ createdAt: -1 })
+
+        if (events.length === 0) {
+            return res.status(200).send({ status: 'error', msg: 'No Events created' })
+        }
+
+        return res.status(200).send({ status: 'ok', msg: 'success', events })
+    } catch (error: any) {
+        console.log(error)
+        if (error.name == 'JsonWebTokenError') {
+            return res.status(400).send({ status: 'error', msg: 'Invalid token' })
+        }
+        return res.status(500).send({ status: 'error', msg: 'Internal server error' })
+    }
+})
+
+
 // ======================== UPDATE EVENT ========================
 router.post('/update', multer.single('image'), token, async (req: Request, res: Response) => {
     try {
-        const event: any = await Event.findById((req as any).user._id)
+        const { eventId } = req.body
+
+        const event: any = await Event.findById(eventId)
 
         if (!event) {
             return res.status(404).send({ status: 'error', msg: 'Event not found' })
         }
+
+        if (event.organizer.toString() !== (req as any).user._id) {
+            return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
+        }
+
+        // Image update
+        if ((req as any).file) {
+            // delete old image if exists
+            if (event.imgId) {
+                try {
+                    await cloudinary.uploader.destroy(event.imgId)
+                } catch (err) {
+                    console.error('Cloudinary delete error:', err)
+                }
+            }
+
+            const upload = await cloudinary.uploader.upload((req as any).file.path, {
+                folder: 'event_images'
+            })
+
+            event.imgUrl = upload.secure_url
+            event.imgId = upload.public_id
+        }
+
+        // Update other event fields
+        const { title, description, address, startDate, endDate, capacity, category, isPublic } = req.body
+        
+        event.title = title || event.title
+        event.description = description || event.description
+        event.address = address || event.address
+        event.startDate = startDate || event.startDate
+        event.endDate = endDate || event.endDate
+        event.capacity = capacity || event.capacity
+        event.category = category || event.category
+        event.isPublic = isPublic ?? event.isPublic
+        
+        // Handle location update if provided
+        if (req.body.lng !== undefined && req.body.lat !== undefined) {
+            event.location = {
+                type: 'Point',
+                coordinates: [Number(req.body.lng), Number(req.body.lat)]
+            }
+        }
+
+        await event.save()
+
+        return res.status(200).send({ status: 'ok', msg: 'success', event })
+    } catch (error: any) {
+        console.log(error)
+        if (error.name == 'JsonWebTokenError') {
+            return res.status(400).send({ status: 'error', msg: 'Invalid token' })
+        }
+        return res.status(500).send({ status: 'error', msg: 'Internal server error' })
     }
 })
 
-// ======================== GET NEARBY EVENTS ========================
 
-// ======================== GET NEARBY EVENTS ========================
+// ======================== CANCEL EVENT ========================
+router.post('/cancel', token, async(req: Request, res: Response) => {
+    try {
+        const { eventId } = req.body
+        const event: any = await Event.findById(eventId)
+
+        if (!event) {
+            return res.status(404).send({ status: 'error', msg: 'Event not found' })
+        }
+
+        if (event.organizer.toString() !== (req as any).user._id) {
+            return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
+        }
+
+        event.isCancelled = true
+        await event.save()
+
+        return res.status(200).send({ status: 'ok', msg: 'success' })
+    } catch (error: any) {
+        console.log(error)
+        if (error.name == 'JsonWebTokenError') {
+            return res.status(400).send({ status: 'error', msg: 'Invalid token' })
+        }
+        return res.status(500).send({ status: 'error', msg: 'Internal server error' })
+    }
+})
+
+// ======================== DELETE EVENTS ========================
+router.post('/delete', token, async(req: Request, res: Response) => {
+    try {
+        const { eventId } = req.body
+        const event: any = await Event.findById(eventId)
+
+        if (!event) {
+            return res.status(404).send({ status: 'error', msg: 'Event not found' })
+        }
+
+        if (event.organizer.toString() !== (req as any).user._id) {
+            return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
+        }
+
+        // delete image from cloudinary
+        if (event.imgId) {
+            try {
+                await cloudinary.uploader.destroy(event.imgId)
+            } catch (err) {
+                console.error('Cloudinary delete error:', err)
+            }
+        }
+
+        await event.deleteOne()
+
+        return res.status(200).send({ status: 'ok', msg: 'success' })
+    } catch (error: any) {
+        console.log(error)
+        if (error.name == 'JsonWebTokenError') {
+            return res.status(400).send({ status: 'error', msg: 'Invalid token' })
+        }
+        return res.status(500).send({ status: 'error', msg: 'Internal server error' })
+    }
+})
 export default router

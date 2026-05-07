@@ -28,6 +28,12 @@ app.use('/auth', auth)
 import profile from './user_routes/profile'
 app.use('/profile', profile)
 
+import event from './user_routes/event'
+app.use('/event', event)
+
+import savedEvent from './user_routes/savedEvent'
+app.use('/saved_event', savedEvent)
+
 // server
 const port = process.env.PORT || 4600
 app.listen(port, () => {
