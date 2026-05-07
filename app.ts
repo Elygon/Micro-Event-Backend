@@ -40,6 +40,9 @@ app.use('/attendance', attendance)
 import comment from './user_routes/comment'
 app.use('/comment', comment)
 
+import category from './user_routes/category'
+app.use('/category', category)
+
 // server
 const port = process.env.PORT || 4600
 app.listen(port, () => {
