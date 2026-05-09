@@ -49,8 +49,13 @@ router.post('/update', uploader.any(), token, async (req: Request, res: Response
             return res.status(404).send({ status: 'error', msg: 'User not found'})
         }
 
+        // Find the uploaded file
+        const files = (req as any).files
+
         // Image handling
-        if ((req as any).file) {
+        if (files && files.length > 0) {
+            const file = files[0]
+            
             // delete old image if exists
             if (user.profile_img_id) {
                 try {
@@ -62,7 +67,7 @@ router.post('/update', uploader.any(), token, async (req: Request, res: Response
             }
     
             // upload new image to cloudinary
-            const upload = await cloudinary.uploader.upload((req as any).file.path, {
+            const upload = await cloudinary.uploader.upload(file.path, {
                 folder: 'profile_photo'
             })
 

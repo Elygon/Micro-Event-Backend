@@ -3,17 +3,8 @@ import path from 'path'
 import { Request } from 'express'
 
 // 1. Storage config (you can customize destination if needed)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/') // make sure this folder exists
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = Date.now() + path.extname(file.originalname)
-    cb(null, uniqueName)
-  }
-})
+const storage = multer.diskStorage({})
 
-// 2. File filter
 const fileFilter = (
   req: Request,
   file: Express.Multer.File,
