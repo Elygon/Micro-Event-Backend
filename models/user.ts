@@ -10,12 +10,16 @@ export interface IUser extends Document {
     password?: string
     profile_img_id?: string
     profile_img_url?: string
-    bio?: String //Short description
+    bio?: string //Short description
     interests?: string[]
     location?: {
         type: 'Point',
         coordinates: [number, number] // [longitude, latitude]
     }
+    isVerified: boolean
+    verificationOTP: string
+    otpExpiresAt: Date
+    isOnline: boolean
     createdAt: Date
     updatedAt: Date
 }
@@ -44,8 +48,12 @@ const userSchema: Schema<IUser> = new Schema({
     },
     interests: [{
         type: String,
-        enum: [ 'Tech', 'Music', 'Sports', 'Hanging', 'Fitness', 'Gaming']
-    }]
+        enum: [ 'Tech', 'Music', 'Sports', 'Hang-Out', 'Fitness', 'Gaming']
+    }],
+    isVerified: { type: Boolean, default: false },
+    verificationOTP: String,
+    otpExpiresAt: Date,
+    isOnline: { type: Boolean, default: false }
 }, { timestamps: true, collection: 'users' })
 
 // Query nearby locations

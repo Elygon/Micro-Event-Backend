@@ -4,18 +4,19 @@ const router = express.Router()
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import User from '../models/user'
-
 import token from '../middleware/userToken'
+import{ sendVerificationOTP } from '../utils/nodemailer' 
 
 
 // ======================== TYPES ========================
-type RegisterBody = {
+type JoinBody = {
     firstname: string
     middlename?: string
     lastname: string
     username: string
     email: string
     password: string
+    interests: string[]
 }
 
 type LoginBody = {
@@ -41,10 +42,10 @@ type ResetPasswordBody = {
 
 
 // create account
-router.post('/register', async (req: Request, res: Response) => {
-    const { firstname, middlename, lastname, username, email, /*phone_no,*/ password } = req.body as RegisterBody
+router.post('/join', async (req: Request, res: Response) => {
+    const { firstname, middlename, lastname, username, email, /*phone_no,*/ password, interests } = req.body as JoinBody
 
-    if (!firstname || !lastname || !username || !email /*|| !phone_no*/ || !password)
+    if (!firstname || !lastname || !username || !email /*|| !phone_no*/ || !password || !interests)
         return res.status(400).send({ status: 'error', msg: 'All fields must be filled' })
 
     // Start try block
@@ -52,11 +53,17 @@ router.post('/register', async (req: Request, res: Response) => {
         //Check if user already exists
         const check = await User.findOne({ email })
         if (check) {
-            return res.status(200).send({ status: 'ok', msg: 'An account with this email already exists' })
+            return res.status(409).send({ status: 'ok', msg: 'An account with this email already exists' })
         }
 
         //Hash password
         const hashedpassword = await bcrypt.hash(password, 10)
+
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString()
+
+        // OTP expires in 15 minutes
+        const otpExpiry = new Date(Date.now() + 15 * 60 * 1000)
 
         //Create new user
         const user = new User()
@@ -67,7 +74,10 @@ router.post('/register', async (req: Request, res: Response) => {
         user.email = email
         /*user.phone_no = phone_no || null*/
         user.password = hashedpassword
-        //user.is_verified = false
+        user.interests = interests
+        user.isVerified = false
+        user.verificationOTP = otp
+        user.otpExpiresAt = otpExpiry
         user.profile_img_url = ""
         user.profile_img_id = ""
 
@@ -79,16 +89,24 @@ router.post('/register', async (req: Request, res: Response) => {
             { userId: user._id, email: user.email, phone_no: user.phone_no },
             process.env.JWT_SECRET,
             { expiresIn: "30m" }
-        )
-        
-        // Optionallly, send OTP/email verification only if email is provided
+        )*/
+
+        // send verification OTP
         if (email) {
-            await sendOTP(email, fullname, verificationToken)
+            await sendVerificationOTP(email, firstname, otp)
         }
-*/
-        return res.status(200).send({
-            status: "ok", msg: "success"
-            /*msg: "Account created! Check your email to verify your account."*/, user
+
+        return res.status(201).send({
+            status: "ok", msg: "Account created! Check your email to verify your account.", user: {
+                _id: user._id,
+                firstname: user.firstname,
+                middlename: user.middlename,
+                lastname: user.lastname,
+                username: user.username,
+                email: user.email,
+                interests: user.interests,
+                isVerified: user.isVerified
+            }
         })
 
     } catch (error: any) {
@@ -99,26 +117,45 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 })
 
-// endpoint to verify account
-/*
-router.get("/verify/:token", async (req, res) => {
-    const { token } = req.params
-
+// endpoint to verify OTP
+router.post("/verify_otp", async (req: Request, res: Response) => {
     try {
-        const user = jwt.verify(token, process.env.JWT_SECRET)
-        
-        const Vuser = await User.findById({_id: user._id})
-        if (!Vuser)
-            return res.status(400).send({ status: "error", msg: "User not found" })
-        
-        if (Vuser.is_verified)
-            return res.status(200).send({ status: "ok", msg: "Account already verified" })
-        Vuser.is_verified = true
-        await Vuser.save()
+        const { email, otp } = req.body
+
+        if (!email || !otp) {
+            return res.status(400).send({ status: "error", msg: "Email and OTP are required" })
+        }
+
+        const user: any = await User.findOne({ email })
+
+        if (!user) {
+            return res.status(404).send({ status: "error", msg: "User with this email not found" })
+        }
+
+        // Already verified
+        if (user.isVerified)
+            return res.status(409).send({ status: "ok", msg: "Account already verified" })
+
+        // Wrong OTP
+        if  (user.verificationOTP !== otp) {
+            return res.status(400).send({ status: "error", msg: "Invalid OTP" })
+        }
+
+        // OTP expired
+        if (new Date() > user.otpExpiresAt) {
+            return res.status(400).send({ status: "error", msg: "OTP expired" })
+        }
+
+        // Verify account
+        user.isVerified = true
+        user.verificationOTP = ""
+        user.otpExpiresAt = null
+        await user.save()
         
         return res.status(200).send({ status: "ok", msg: "Account successfully verified" })
         
-    } catch (error) {
+    } catch (error: any) {
+        console.log(error)
         if (error.name === "TokenExpiredError")
             return res.status(400).send({ status: "error", msg: "Verification link expired" })
             
@@ -129,7 +166,59 @@ router.get("/verify/:token", async (req, res) => {
         return res.status(500).send({ status: "error", msg: "Verification failed" })
     }
 })
-*/
+
+
+// endpoint to resend OTP
+router.post("/resend_otp", async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body
+
+        if (!email) {
+            return res.status(400).send({ status: "error", msg: "Email is required" })
+        }
+
+        // Find user
+        const user: any = await User.findOne({ email })
+
+        if (!user) {
+            return res.status(404).send({ status: "error", msg: "User with this email not found" })
+        }
+
+        // Prevent resending OTP if already verified
+        if (user.isVerified)
+            return res.status(409).send({ status: "ok", msg: "Account already verified" })
+
+
+        // Generate new OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString()
+
+        // OTP expires in 15 minutes
+        const otpExpiry = new Date(Date.now() + 15 * 60 * 1000)
+
+        // Update user with new OTP
+        user.verificationOTP = otp
+        user.otpExpiresAt = otpExpiry
+
+        await user.save()
+
+        // send verification OTP
+        await sendVerificationOTP(user.email, user.firstname, otp)
+
+        
+        return res.status(200).send({ status: "ok", msg: "New OTP successfully sent" })
+        
+    } catch (error: any) {
+        console.log(error)
+        if (error.name === "TokenExpiredError")
+            return res.status(400).send({ status: "error", msg: "Verification link expired" })
+            
+        if (error.name === "JsonWebTokenError")
+            return res.status(400).send({ status: "error", msg: "Invalid verification token" })
+            
+        console.error(error)
+        return res.status(500).send({ status: "error", msg: "Verification failed" })
+    }
+})
 
 //endpoint to Login
 router.post('/login', async (req: Request, res: Response) => {
@@ -141,15 +230,14 @@ router.post('/login', async (req: Request, res: Response) => {
         // Fetch user using email
         let user: any = await User.findOne({ email }).lean()
         if (!user)
-            return res.status(400).send({
+            return res.status(404).send({
                 status: 'error', msg: 'No account found with the provided email'
             })
 
         // check if user's account has been verified
-        /*
-        if (user.is_verified) {
-            return res.status(400).send({ status: "error", msg: "Please verify your account first." })
-        }*/
+        if (user.isVerified === false) {
+            return res.status(403).send({ status: "error", msg: "Please verify your account first." })
+        }
 
         // // check if blocked
         // if (user.is_blocked === true) {
@@ -178,10 +266,19 @@ router.post('/login', async (req: Request, res: Response) => {
         }, process.env.jwt_secret as string, { expiresIn: '1d' })
 
         //update user document to online
-        user = await User.findOneAndUpdate({ _id: user._id }, { is_online: true }, { new: true }).lean()
+        user = await User.findOneAndUpdate({ _id: user._id }, { isOnline: true }, { new: true }).lean()
 
         //send response
-        res.status(200).send({ status: 'ok', msg: 'success', user, token })
+        res.status(200).send({ status: 'ok', msg: 'success', user: {
+            _id: user._id,
+            firstname: user.firstname,
+            lastname: user.lastname,
+            username: user.username,
+            email: user.email,
+            interests: user.interests,
+            isVerified: user.isVerified,
+            isOnline: user.isOnline
+        }, token })
 
     } catch (error) {
         console.log(error)
@@ -195,7 +292,7 @@ router.post('/logout', token, async (req: Request, res: Response) => {
         const userId = (req as any).user._id
 
         // Set user offline
-        await User.findByIdAndUpdate(userId, { is_online: false })
+        await User.findByIdAndUpdate(userId, { isOnline: false })
 
         return res.status(200).send({ status: 'ok', msg: 'success' })
 
@@ -222,7 +319,7 @@ router.post('/change_password', token, async (req: Request, res: Response) => {
         const user: any = await User.findById((req as any).user._id).select("password")
 
         if (!user) {
-            return res.status(400).send({ status: 'error', msg: 'User not found' })
+            return res.status(404).send({ status: 'error', msg: 'User not found' })
         }
 
         //Compare old password
@@ -384,7 +481,7 @@ router.get("/reset_password/:resetPasswordCode",
                         you want to use in recovering your account
                     </h6>    
           
-                    <form action="http://localhost:1000/auth/reset_password" method="post">
+                    <form action="http://localhost:4600/auth/reset_password" method="post">
                         <div class="imgcontainer"> </div>
                         <div class="container">
                             <input type="password" placeholder="Enter new password" name="new_password" required style="border-radius: 5px" minlength="11">
@@ -499,7 +596,7 @@ router.post('/delete', token, async (req: Request, res: Response) => {
 
         //Check if the user exists and was deleted
         if (!deleted)
-            return res.status(400).send({ status: 'error', msg: 'No user Found' })
+            return res.status(404).send({ status: 'error', msg: 'No user Found' })
 
         return res.status(200).send({ status: 'ok', msg: 'success' })
 
