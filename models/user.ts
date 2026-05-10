@@ -42,11 +42,9 @@ const userSchema: Schema<IUser> = new Schema({
         type: {
             type: String, // Embedded GeoJSON Point
             enum: ['Point'],
-            default: 'Point'
         }, 
         coordinates: {
             type: [Number], // [longitude, latitude]
-            default: [0, 0] // Default coordinates
         }
     },
     interests: [{

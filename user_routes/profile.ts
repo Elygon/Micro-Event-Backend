@@ -16,6 +16,8 @@ type UpdateProfileBody = {
   email?: string
   bio?: string
   interests?: 'Tech' | 'Music' | 'Sports'
+  longitude?: string
+  latitude?: string
 }
 
 // ======================== VIEW PROFILE ========================
@@ -43,7 +45,9 @@ router.post('/view', token, async (req: Request, res: Response) => {
 // ======================== UPDATE PROFILE ========================
 router.post('/update', uploader.any(), token, async (req: Request, res: Response) => {
     try {
-        const { firstname, middlename, lastname, username, email, bio, interests} = req.body as UpdateProfileBody
+        const { 
+            firstname, middlename, lastname, username, email, bio, interests, longitude, latitude 
+        } = req.body as UpdateProfileBody
 
         let user: any = await User.findById((req as any).user._id)
 
@@ -85,6 +89,14 @@ router.post('/update', uploader.any(), token, async (req: Request, res: Response
         user.email = email || user.email
         user.bio = bio || user.bio
         user.interests = interests || user.interests
+
+        // Update location
+        if (longitude !== undefined && latitude !== undefined) {
+            user.location = {
+                type: 'Point',
+                coordinates: [Number(longitude), Number(latitude)]
+            }
+        }
 
         await user.save()
 
