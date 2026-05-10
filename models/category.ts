@@ -20,3 +20,22 @@ const categorySchema = new Schema<ICategory>({
 
 const Category = mongoose.model<ICategory>('Category', categorySchema)
 export default Category
+
+
+// [
+//   "Music",
+//   "Tech",
+//   "Gaming",
+//   "Sports",
+//   "Education",
+//   "Networking",
+//   "Comedy",
+//   "Fitness",
+//   "Food & Drinks",
+//   "Art",
+//   "Movies",
+//   "Travel",
+//   "Community",
+//   "Festivals",
+//   "Virtual Events"
+// ]

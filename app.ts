@@ -4,9 +4,8 @@ const app: Application = express()
 import dotenv from 'dotenv'
 dotenv.config()
 
+import { seedCategories } from "./utils/seedCategories"
 import initCron from './utils/cron'
-// Initialize Cron Jobs
-initCron()
 
 // middlewares
 app.use(express.json())
@@ -24,6 +23,9 @@ con.on('open', error => {
     }
 })
 
+seedCategories()
+// Initialize Cron Jobs
+initCron()
 
 //routes
 import auth from './user_routes/auth'

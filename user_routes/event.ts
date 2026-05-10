@@ -166,7 +166,9 @@ router.post('/update', multer.single('image'), token, async (req: Request, res: 
             return res.status(404).send({ status: 'error', msg: 'Event not found' })
         }
 
-        if (event.organizer.toString() !== (req as any).user._id) {
+        const userId = (req as any).user._id
+
+        if (!event.organizer.equals(userId)) {
             return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
         }
 
