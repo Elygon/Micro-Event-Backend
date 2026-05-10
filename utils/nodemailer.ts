@@ -147,10 +147,6 @@ export const sendDeleteAccountMail = async ( email: string, firstname: string, d
                 Your account is not deleted yet.
             </p>
 
-            <p>
-                Click the button below to confirm the request.
-            </p>
-
             <div style="
                 margin:30px 0;
                 padding:25px;

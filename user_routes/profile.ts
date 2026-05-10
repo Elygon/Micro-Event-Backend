@@ -21,7 +21,9 @@ type UpdateProfileBody = {
 // ======================== VIEW PROFILE ========================
 router.post('/view', token, async (req: Request, res: Response) => {
     try {
-        const user = await User.findById((req as any).user._id).lean()
+        const user = await User.findById((req as any).user._id)
+        .select( '-password -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt')
+        .lean()
 
         if (!user) {
             return res.status(200).send({ status: 'ok', msg: 'No User Found', user})

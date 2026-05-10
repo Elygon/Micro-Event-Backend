@@ -58,7 +58,7 @@ const userSchema: Schema<IUser> = new Schema({
     otpExpiresAt: Date,
     isOnline: { type: Boolean, default: false },
     deletionRequested: { type: Boolean, default: false },
-    deletionRequestedAt: { type: Boolean, default: null },
+    deletionRequestedAt: { type: Date, default: null },
     scheduledDeletionAt: { type: Date, default: null }
 }, { timestamps: true, collection: 'users' })
 

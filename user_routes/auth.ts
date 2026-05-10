@@ -858,6 +858,30 @@ router.get('/confirm_delete/:token', async(req: Request<{ token: string }>, res:
                     border:1px solid ${BRAND.border};
                     text-align:center;
                 ">
+
+                    <div style="
+                        width:70px;
+                        height:70px;
+                        margin:0 auto 20px;
+                        border-radius:50%;
+                        background:rgba(109, 27, 59, 0.12);
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                    ">
+                        <svg viewBox="0 0 24 24" style="
+                            width:34px;
+                            height:34px;
+                            stroke:#6d1b3b;
+                            fill:none;
+                            stroke-width:2;
+                        ">
+                            <path d="M12 9v4"></path>
+                            <path d="M12 17h.01"></path>
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        </svg>
+                    </div>
+
                     <h2 style="color:${BRAND.primary};">
                         Confirm Account Deletion
                     </h2>
@@ -872,13 +896,13 @@ router.get('/confirm_delete/:token', async(req: Request<{ token: string }>, res:
                         <button type="submit" style="
                             width:100%;
                             padding:12px;
-                            background:#ff3b30;
+                            background:#6d1b3b;
                             color:white;
                             border:none;
                             border-radius:8px;
                             font-weight:bold;
                             cursor:pointer;
-                            margin-top:10px;
+                            margin-top:24px;
                         ">
                             Yes, Delete My Account
                         </button>
@@ -947,45 +971,87 @@ router.post('/confirm_delete', async(req: Request, res: Response) => {
 
         await user.save()
 
-        return res.send(`
+        res.status(200).send(`
             <!DOCTYPE html>
-            <html>
+            <html lang="en">
             <head>
-                <title>Deletion Scheduled</title>
+                <meta charset="UTF-8">
+                <title>Account Update</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1">
             </head>
             <body style="
-                margin:0;
-                font-family:Arial;
-                background:${BRAND.secondary};
-                display:flex;
-                justify-content:center;
-                align-items:center;
-                height:100vh;
+                margin: 0;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                background-color: ${BRAND.secondary || '#ffffff'};
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
             ">
-                <div style="
-                    width:100%;
-                    max-width:420px;
-                    background:${BRAND.white};
-                    padding:30px;
-                    border-radius:14px;
-                    border:1px solid ${BRAND.border};
-                    text-align:center;
-                ">
-                    <h2 style="color:${BRAND.primary};">
-                        Account Scheduled For Deletion
-                    </h2>
-                    <p style="color:${BRAND.textLight};">
-                        Your account will be permanently deleted in 7 days.
-                    </p>
-                    <p style="color:${BRAND.textLight}; font-size: 14px;">
-                        Logging back in before then will cancel the deletion request.
-                    </p>
+
+            <div style="
+                width: 100%;
+                max-width: 375px;
+                padding: 24px;
+                text-align: center;
+            ">
+
+                <!-- Minimalist Professional Icon (SVG) -->
+                <div style="margin-bottom: 32px;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="11" stroke="${BRAND.primary}" stroke-width="1.5"/>
+                        <path d="M12 7V12L15 15" stroke="${BRAND.primary}" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
                 </div>
+
+                <h2 style="
+                    color: ${BRAND.textDark || '#000000'}; 
+                    margin: 0 0 16px 0; 
+                    font-size: 23px; 
+                    font-weight: 765;
+                    letter-spacing: -0.8px;
+                ">
+                    Account Scheduled for Deletion
+                </h2>
+        
+                <p style="
+                    color: ${BRAND.textLight || '#65676b'}; 
+                    font-size: 16px; 
+                    line-height: 1.5; 
+                    margin-bottom: 40px;
+                ">
+                    We've received your request. Your account and all event data will be permanently removed in <strong>7 days</strong>.
+                </p>
+
+                <!-- Social-Style Action Button -->
+                <button style="
+                    background-color: ${BRAND.primary};
+                    color: ${BRAND.white || '#ffffff'};
+                    border: none;
+                    padding: 16px;
+                    border-radius: 50px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    width: 100%;
+                    margin-bottom: 16px;
+                    cursor: pointer;
+                ">
+                    Keep My Account
+                </button>
+
+                <p style="
+                    color: ${BRAND.textLight || '#8a8d91'}; 
+                    font-size: 14px; 
+                    line-height: 1.4;
+                ">
+                    Logging back in before the deadline will automatically cancel this request.
+                </p>
+            </div>
             </body>
             </html>
         `)
     } catch (error: any) {
+        console.error("DELETION_ERROR:", error);
         if (error.name === "TokenExpiredError") {
             return res.status(400).send({ status: 'error', msg: 'Deletion token expired' })
         }
