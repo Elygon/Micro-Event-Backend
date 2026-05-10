@@ -2,12 +2,12 @@ import mongoose, { Schema, Document, Model } from 'mongoose'
 
 // Define a TypeScript interface
 export interface IUser extends Document {
-    firstname?: string
+    firstname: string
     middlename?: string
-    lastname?: string
-    username?: string
-    email?: string,
-    password?: string
+    lastname: string
+    username: string
+    email: string,
+    password: string
     profile_img_id?: string
     profile_img_url?: string
     bio?: string //Short description
@@ -17,9 +17,12 @@ export interface IUser extends Document {
         coordinates: [number, number] // [longitude, latitude]
     }
     isVerified: boolean
-    verificationOTP: string
-    otpExpiresAt: Date
+    verificationOTP?: string
+    otpExpiresAt?: Date
     isOnline: boolean
+    deletionRequested: boolean
+    deletionRequestedAt?: Date
+    scheduledDeletionAt?: Date
     createdAt: Date
     updatedAt: Date
 }
@@ -53,7 +56,10 @@ const userSchema: Schema<IUser> = new Schema({
     isVerified: { type: Boolean, default: false },
     verificationOTP: String,
     otpExpiresAt: Date,
-    isOnline: { type: Boolean, default: false }
+    isOnline: { type: Boolean, default: false },
+    deletionRequested: { type: Boolean, default: false },
+    deletionRequestedAt: { type: Boolean, default: null },
+    scheduledDeletionAt: { type: Date, default: null }
 }, { timestamps: true, collection: 'users' })
 
 // Query nearby locations

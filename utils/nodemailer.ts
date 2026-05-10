@@ -62,7 +62,6 @@ export const sendVerificationOTP = async ( email: string, firstname: string, otp
 }
 
 
-
 // send reset password email
 export const sendResetPassword = async ( email: string, firstname: string, resetLink: string ) => {
     return await transporter.sendMail({
@@ -115,6 +114,87 @@ export const sendResetPassword = async ( email: string, firstname: string, reset
             <p>
                 This link will expire in <strong>10 minutes</strong> for your security.
             </p>
+
+            <p style="
+                font-size:14px;
+                color:#888;
+                margin-top:30px;
+            ">
+                If you did not request this, you can safely ignore this email.
+            </p>
+            `
+        )
+    })
+}
+
+
+// send delete account request email
+export const sendDeleteAccountMail = async ( email: string, firstname: string, deleteLink: string ) => {
+    return await transporter.sendMail({
+        from: `"Micro-Event Discovery" <${process.env.MAIL_USER}>`,
+        to: email,
+        subject: "Confirm Account Deletion",
+        html: buildEmailTemplate(
+            "Delete Account Request",
+            `
+            <p>Hello ${firstname}, </p>
+
+            <p>
+                We received a request to delete your account.
+            </p>
+
+            <p>
+                Your account is not deleted yet.
+            </p>
+
+            <p>
+                Click the button below to confirm the request.
+            </p>
+
+            <div style="
+                margin:30px 0;
+                padding:25px;
+                text-align:center;
+                background:${BRAND.secondary};
+                border-radius:12px;
+                border:1px solid ${BRAND.border};
+            ">
+
+                <p style="
+                    font-size:18px;
+                    color:${BRAND.textDark};
+                    margin-bottom:15px;
+                ">
+                    Click the button below to reset your password
+                </p>
+
+                <a href="${deleteLink}" style="
+                    display:inline-block;
+                    padding:14px 28px;
+                    background:${BRAND.primary};
+                    color:#fff;
+                    text-decoration:none;
+                    border-radius:10px;
+                    font-weight:bold;
+                ">
+                    Confirm Account Deletion
+                </a>
+
+            </div>
+
+            <p>
+                After confirmation, your account will enter a 7-day recovery period.
+            </p>
+
+            <p>
+                If you log back in before 7 days, the deletion request will be cancelled automatically.
+            </p>
+
+            <p>
+                This link will expire in <strong>10 minutes</strong> for your security.
+            </p>
+
+            <br/>
 
             <p style="
                 font-size:14px;

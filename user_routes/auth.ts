@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import User from '../models/user'
 import token from '../middleware/userToken'
-import{ sendVerificationOTP, sendResetPassword } from '../utils/nodemailer'
+import{ sendVerificationOTP, sendResetPassword, sendDeleteAccountMail } from '../utils/nodemailer'
 import { BRAND } from "../utils/emailTemplate"
 
 
@@ -259,6 +259,15 @@ router.post('/login', async (req: Request, res: Response) => {
         const correct_password = await bcrypt.compare(password, user.password)
         if (!correct_password)
             return res.status(400).send({ status: 'error', msg: 'Password is incorrect' })
+
+        // cancel deletion if user logs in again
+        if (user.deletionRequested) {
+            await User.findByIdAndUpdate(user._id, {
+                deletionRequested: false,
+                deletionRequestedAt: null,
+                scheduledDeletionAt: null
+            })
+        }
 
         // create token
         const token = jwt.sign({
@@ -743,17 +752,47 @@ router.post("/reset_password", async (req: Request, res: Response) => {
 })
 
 
-//endpoint to delete account
-router.post('/delete', token, async (req: Request, res: Response) => {
+//endpoint to request to delete account
+router.post('/request_delete', token, async (req: Request, res: Response) => {
     try {
-        //Find the user and delete the account
-        const deleted = await User.findByIdAndDelete((req as any).user._id)
+        const { password } = req.body
+        
+        if (!password) {
+            return res.status(400).send({ status: 'error', msg: 'Password is required to request account deletion' })
+        }
 
-        //Check if the user exists and was deleted
-        if (!deleted)
-            return res.status(404).send({ status: 'error', msg: 'No user Found' })
+        //Find the user
+        const user = await User.findById((req as any).user._id)
 
-        return res.status(200).send({ status: 'ok', msg: 'success' })
+        //Check if the user exists
+        if (!user)
+            return res.status(404).send({ status: 'error', msg: 'User not found' })
+
+        // Verify password
+        const isMatch = await bcrypt.compare(password, user.password)
+        if (!isMatch) {
+            return res.status(401).send({ status: 'error', msg: 'Incorrect password' })
+        }
+
+        // already requested
+        if (user.deletionRequested) {
+            return res.status(400).send({ status: 'error', msg: 'Deletion already requested' })
+        }
+
+        // create secure token
+        const deleteToken = jwt.sign(
+            { _id: user._id },
+            process.env.jwt_secret as string,
+            { expiresIn: '10m' }
+        )
+
+        // frontend url
+        const deleteLink = `http://localhost:4600/auth/confirm_delete/${deleteToken}`
+
+        //send email
+        await sendDeleteAccountMail( user.email, user.firstname, deleteLink )
+
+        return res.status(200).send({ status: 'ok', msg: 'Deletion confirmation email sent' })
 
     } catch (error) {
         console.log(error)
@@ -764,6 +803,198 @@ router.post('/delete', token, async (req: Request, res: Response) => {
         return res.status(500).send({ status: 'error', msg: 'An error occured' })
     }
 
+})
+
+// endpoint to delete account webpage
+router.get('/confirm_delete/:token', async(req: Request<{ token: string }>, res: Response) => {
+    try {
+        const { token: deleteToken } = req.params
+        const data: any = jwt.verify(
+            deleteToken, process.env.jwt_secret as string
+        )
+
+        const user: any = await User.findById(data._id)
+
+        if (!user) {
+            return res.status(404).send({ status: 'error', msg: 'User not found' })
+        }
+
+         // prevent duplicate requests
+        if (user.deletionRequested) {
+            return res.send(`
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0; font-family:Arial; background:${BRAND.secondary}; display:flex; justify-content:center; align-items:center; height:100vh;">
+                    <div style="width:100%; max-width:420px; background:${BRAND.white}; padding:30px; border-radius:14px; border:1px solid ${BRAND.border}; text-align:center;">
+                        <h2 style="color:${BRAND.primary};">Deletion Already Scheduled</h2>
+                    </div>
+                </body>
+                </html>
+            `)
+        }
+
+        return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Confirm Deletion</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+            </head>
+            <body style="
+                margin:0;
+                font-family:Arial;
+                background:${BRAND.secondary};
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                height:100vh;
+            ">
+                <div style="
+                    width:100%;
+                    max-width:420px;
+                    background:${BRAND.white};
+                    padding:30px;
+                    border-radius:14px;
+                    border:1px solid ${BRAND.border};
+                    text-align:center;
+                ">
+                    <h2 style="color:${BRAND.primary};">
+                        Confirm Account Deletion
+                    </h2>
+                    <p style="color:${BRAND.textLight};">
+                        Are you sure you want to delete your account? It will be permanently deleted in 7 days.
+                    </p>
+                    <p style="color:${BRAND.textLight}; font-size: 14px;">
+                        Logging back in before then will cancel the deletion request.
+                    </p>
+                    <form action="/auth/confirm_delete" method="POST">
+                        <input type="hidden" name="token" value="${deleteToken}" />
+                        <button type="submit" style="
+                            width:100%;
+                            padding:12px;
+                            background:#ff3b30;
+                            color:white;
+                            border:none;
+                            border-radius:8px;
+                            font-weight:bold;
+                            cursor:pointer;
+                            margin-top:10px;
+                        ">
+                            Yes, Delete My Account
+                        </button>
+                    </form>
+                </div>
+            </body>
+            </html>
+        `)
+    } catch (error: any) {
+
+        if (error.name === "TokenExpiredError") {
+            return res.status(400).send({ status: 'error', msg: 'Deletion link expired' })
+        }
+
+        if (error.name === "JsonWebTokenError") {
+            return res.status(400).send({ status: 'error', msg: 'Invalid deletion link' })
+        }
+
+        console.log(error)
+
+        return res.status(500).send({ status: 'error', msg: 'Something went wrong' })
+    }
+})
+
+// actual POST endpoint to process the deletion
+router.post('/confirm_delete', async(req: Request, res: Response) => {
+    try {
+        const { token } = req.body
+        
+        if (!token) {
+            return res.status(400).send({ status: 'error', msg: 'Token is required' })
+        }
+
+        const data: any = jwt.verify(
+            token, process.env.jwt_secret as string
+        )
+
+        const user: any = await User.findById(data._id)
+
+        if (!user) {
+            return res.status(404).send({ status: 'error', msg: 'User not found' })
+        }
+
+         // prevent duplicate requests
+        if (user.deletionRequested) {
+            return res.send(`
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0; font-family:Arial; background:${BRAND.secondary}; display:flex; justify-content:center; align-items:center; height:100vh;">
+                    <div style="width:100%; max-width:420px; background:${BRAND.white}; padding:30px; border-radius:14px; border:1px solid ${BRAND.border}; text-align:center;">
+                        <h2 style="color:${BRAND.primary};">Deletion Already Scheduled</h2>
+                    </div>
+                </body>
+                </html>
+            `)
+        }
+
+        // schedule deletion
+        user.deletionRequested = true
+        user.deletionRequestedAt = new Date()
+
+        // 7 days later
+        user.scheduledDeletionAt = new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000
+        )
+
+        await user.save()
+
+        return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Deletion Scheduled</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+            </head>
+            <body style="
+                margin:0;
+                font-family:Arial;
+                background:${BRAND.secondary};
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                height:100vh;
+            ">
+                <div style="
+                    width:100%;
+                    max-width:420px;
+                    background:${BRAND.white};
+                    padding:30px;
+                    border-radius:14px;
+                    border:1px solid ${BRAND.border};
+                    text-align:center;
+                ">
+                    <h2 style="color:${BRAND.primary};">
+                        Account Scheduled For Deletion
+                    </h2>
+                    <p style="color:${BRAND.textLight};">
+                        Your account will be permanently deleted in 7 days.
+                    </p>
+                    <p style="color:${BRAND.textLight}; font-size: 14px;">
+                        Logging back in before then will cancel the deletion request.
+                    </p>
+                </div>
+            </body>
+            </html>
+        `)
+    } catch (error: any) {
+        if (error.name === "TokenExpiredError") {
+            return res.status(400).send({ status: 'error', msg: 'Deletion token expired' })
+        }
+        if (error.name === "JsonWebTokenError") {
+            return res.status(400).send({ status: 'error', msg: 'Invalid deletion token' })
+        }
+        console.log(error)
+        return res.status(500).send({ status: 'error', msg: 'Something went wrong' })
+    }
 })
 
 export default router

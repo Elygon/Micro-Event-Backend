@@ -4,6 +4,10 @@ const app: Application = express()
 import dotenv from 'dotenv'
 dotenv.config()
 
+import initCron from './utils/cron'
+// Initialize Cron Jobs
+initCron()
+
 // middlewares
 app.use(express.json())
 app.use(express.urlencoded({extended: true}))
