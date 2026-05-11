@@ -200,8 +200,11 @@ router.post('/my_events', token, async(req: Request, res: Response) => {
 
         const events = await Event.find(query)
         .populate('category')
-        .populate({ path: 'organizer', select: '-password -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt' })
-        .sort({ createdAt: -1 }).skip(skip).limit(limit)
+        .populate({
+            path: 'organizer', 
+            select: 
+            '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt' 
+        }).sort({ createdAt: -1 }).skip(skip).limit(limit)
 
         return res.status(200).send({ status: 'ok', msg: 'success', count: events.length, totalCount, page, limit, 
             totalPages: Math.ceil(totalCount / limit), events

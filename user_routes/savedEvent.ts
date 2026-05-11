@@ -86,14 +86,23 @@ router.post('/unsave', token, async (req: Request, res: Response) => {
 // ======================== VIEW SAVED EVENTS ========================
 router.post('/saved', token, async (req: Request, res: Response) => {
     try {
+        const { page = 1, limit = 10 } = req.body
+        const skip = (page - 1) * limit
+
+        const total = await Event.countDocuments({ isCancelled: false })
         const savedEvents = await SavedEvent.find({ user: (req as any).user._id })
-        .populate({ path: 'event', populate: { path: 'category organizer' } }).sort({ createdAt: -1 })
+        .populate({ path: 'event', populate: [
+            { path: 'category' },
+            { path: 'organizer',
+                select: '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt'
+            } 
+        ]}).sort({ createdAt: -1 }).skip(skip).limit(limit)
 
-        if (savedEvents.length === 0) {
-            return res.status(200).send({ status: 'ok', msg: 'No Events saved' })
-        }
 
-        return res.status(200).send({ status: 'ok', msg: 'success', count: savedEvents.length, savedEvents })
+        return res.status(200).send({ 
+            status: 'ok', msg: 'success', page, limit, total,
+            totalPages: Math.ceil(total / limit), count: savedEvents.length, savedEvents
+        })
 
     } catch (error: any) {
         console.log(error)
