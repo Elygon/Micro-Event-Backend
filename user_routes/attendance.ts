@@ -16,7 +16,7 @@ router.post('/attend', token, async(req: Request, res: Response) => {
         }
 
         // Validate status
-        if (!['going', 'maybe', 'declined'].includes(status)) {
+        if (!['going', 'maybe'].includes(status)) {
             return res.status(400).send({ status: 'error', msg: 'Invalid attendance status' })
         }
 
@@ -176,16 +176,25 @@ router.post('/remove', token, async(req: Request, res: Response) => {
 // ======================== VIEW EVENT ATTENDEES ========================
 router.post('/attendees', token, async(req: Request, res: Response) => {
     try {
+        const { page = 1, limit = 10 } = req.body
+        const skip = (page - 1) * limit
+
         const { eventId } = req.body
 
         if (!eventId) {
             return res.status(400).send({ status: 'error', msg: 'Event ID is required' })
         }
 
-        const attendees = await Attendance.find({ event: eventId, status: 'going' })
-        .populate('user').sort({ createdAt: -1 })
+        const totalCount = await Attendance.countDocuments({ event: eventId, status: 'going' })
+        const attendees = await Attendance.find({ event: eventId, status: 'going' }).populate({
+            path: 'user', select:
+            '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt'
+        }).sort({ createdAt: -1 }).skip(skip).limit(limit)
 
-        return res.status(200).send({ status: 'ok', msg: 'success', attendees })
+        return res.status(200).send({ 
+            status: 'ok', msg: 'success', page, limit, totalCount,
+            totalPages: Math.ceil(totalCount / limit), count: attendees.length, attendees
+        })
 
     } catch (error: any) {
         console.log(error)
@@ -202,7 +211,10 @@ router.post('/my_attendance', token, async(req: Request, res: Response) => {
     try {
         const attendance = await Attendance.find({ user: (req as any).user._id }).populate({
             path: 'event', populate: [
-                { path: 'category' }, { path: 'organizer' }
+                { path: 'category' }, { 
+                    path: 'organizer', select:
+                    '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt'
+                }
             ]
         }).sort({ createdAt: -1 })
 
