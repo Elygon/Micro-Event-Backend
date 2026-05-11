@@ -38,7 +38,7 @@ import event from './user_routes/event'
 app.use('/event', event)
 
 import savedEvent from './user_routes/savedEvent'
-app.use('/saved_event', savedEvent)
+app.use('/savedEvent', savedEvent)
 
 import attendance from './user_routes/attendance'
 app.use('/attendance', attendance)

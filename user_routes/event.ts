@@ -76,10 +76,26 @@ router.post('/create', multer.single('image'), token, async (req: Request, res: 
 
 // ======================== GET ALL EVENTS ========================
 router.post('/all', token, async (req: Request, res: Response) => {
+    const { page = 1, limit = 10 } = req.body
+
+    const skip = (page - 1) * limit
+
     try {
-        const events = await Event.find({ isCancelled: false}).populate('category').populate('organizer').sort({ createdAt: -1})
+        const total = await Event.countDocuments({ isCancelled: false })
+
+        const events = await Event.find({ isCancelled: false})
+        .populate('category')
+        .populate({
+            path: 'organizer', 
+            select: 
+            '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt' 
+        })
+        .sort({ createdAt: -1}).skip(skip).limit(limit)
         
-        return res.status(200).send({ status: 'ok', msg: 'success', events })
+        return res.status(200).send({ 
+            status: 'ok', msg: 'success', page, limit, total,
+            totalPages: Math.ceil(total / limit), count: events.length, events 
+        })
     } catch (error) {
         console.log(error)
         return res.status(500).send({ status: 'error', msg: 'Internal server error' })
@@ -90,27 +106,58 @@ router.post('/all', token, async (req: Request, res: Response) => {
 // ======================== GET NEARBY EVENTS ========================
 router.post('/nearby', token, async (req: Request, res: Response) => {
     try {
+        const { page = 1, limit = 10 } = req.body
         const { lng, lat, radius = 5000 } = req.body as { lng: number, lat: number, radius: number }
 
         if (lng === undefined || lat === undefined) {
             return res.status(400).send({ status: 'error', msg: 'longitude and latitude are required' })
         }
 
-        const events = await Event.find({
+        const skip = (page - 1) * limit
+
+        const centerCoordinates = [lng, lat]
+
+        // convert radius from meters to radians for $centerSphere (Earth's radius is approx 6378.1 km)
+        const radiusInRadians = radius / 6378100
+
+        // 1. Query for Counting (Uses $geoWithin to avoid the sorting error)
+        const countQuery = {
             location: {
-                $near: {
-                    $geometry: {
-                        type: 'Point',
-                        coordinates: [Number(lng), Number(lat)]
-                    },
-                    $maxDistance: Number(radius)
+                $geoWithin: {
+                    $centerSphere: [centerCoordinates, radiusInRadians]
                 }
             },
             isCancelled: false
-        }).populate('category').populate('organizer')
+        }
 
-        return res.status(200).send({ status: 'ok', msg: 'success', events})
-    } catch (error) {
+        // 2. Query for Data (Uses $near to provide distance-based sorting)
+        const dataQuery = {
+            location: {
+                $near: {
+                    $geometry: { type: 'Point', coordinates: centerCoordinates },
+                    $maxDistance: radius
+                }
+            },
+            isCancelled: false
+        }
+        
+        // Execute both
+        const totalCount = await Event.countDocuments(countQuery)
+        const events = await Event.find(dataQuery).populate('category')
+        .populate({
+            path: 'organizer', 
+            select: 
+            '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt' 
+        }).skip(skip).limit(limit)
+
+        return res.status(200).send({ 
+            status: 'ok', msg: 'success', count: events.length, totalCount, page, limit, 
+            totalPages: Math.ceil(totalCount / limit), events 
+        })
+    } catch (error: any) {
+        // Log the error to see what's happening
+        console.error('Nearby Error:', error)
+        
         return res.status(500).send({ status: 'error', msg: 'Internal server error' })
     }
 })
@@ -121,14 +168,22 @@ router.post('/single', token, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.body
         
-        const event = await Event.findById(eventId).populate('category').populate('organizer')
+        const event = await Event.findById(eventId).populate('category')
+        .populate({
+            path: 'organizer', 
+            select: 
+            '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt' 
+        })
 
         if (!event) {
             return res.status(404).send({ status: 'error', msg: 'Event not found' })
         }
 
         return res.status(200).send({ status: 'ok', msg: 'success', event })
-    } catch (error) {
+    } catch (error: any) {
+        // Log the error to see what's happening
+        console.error("Single Event Fetch Error:", error.message)
+        
         return res.status(500).send({ status: 'error', msg: 'Internal server error' })
     }
 })
@@ -137,14 +192,20 @@ router.post('/single', token, async (req: Request, res: Response) => {
 // ======================== MY EVENTS ========================
 router.post('/my_events', token, async(req: Request, res: Response) => {
     try {
-        const events = await Event.find({ organizer: (req as any).user._id })
-        .populate('category').populate('organizer').sort({ createdAt: -1 })
+        const { page = 1 , limit = 10 } = req.body
+        const skip = (page - 1) * limit
 
-        if (events.length === 0) {
-            return res.status(200).send({ status: 'error', msg: 'No Events created' })
-        }
+        const query = { organizer: (req as any).user._id }
+        const totalCount = await Event.countDocuments(query)
 
-        return res.status(200).send({ status: 'ok', msg: 'success', events })
+        const events = await Event.find(query)
+        .populate('category')
+        .populate({ path: 'organizer', select: '-password -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt' })
+        .sort({ createdAt: -1 }).skip(skip).limit(limit)
+
+        return res.status(200).send({ status: 'ok', msg: 'success', count: events.length, totalCount, page, limit, 
+            totalPages: Math.ceil(totalCount / limit), events
+        })
     } catch (error: any) {
         console.log(error)
         if (error.name == 'JsonWebTokenError') {
@@ -225,7 +286,7 @@ router.post('/update', multer.single('image'), token, async (req: Request, res: 
 
 
 // ======================== CANCEL EVENT ========================
-router.post('/cancel', token, async(req: Request, res: Response) => {
+/*router.post('/cancel', token, async(req: Request, res: Response) => {
     try {
         const { eventId } = req.body
         const event: any = await Event.findById(eventId)
@@ -234,7 +295,9 @@ router.post('/cancel', token, async(req: Request, res: Response) => {
             return res.status(404).send({ status: 'error', msg: 'Event not found' })
         }
 
-        if (event.organizer.toString() !== (req as any).user._id) {
+        const userId = (req as any).user._id
+
+        if (!event.organizer.equals(userId)) {
             return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
         }
 
@@ -251,6 +314,70 @@ router.post('/cancel', token, async(req: Request, res: Response) => {
     }
 })
 
+
+// ======================== RESTORE EVENT ========================
+router.post('/restore', token, async(req: Request, res: Response) => {
+    try {
+        const { eventId } = req.body
+        const event: any = await Event.findById(eventId)
+
+        if (!event) {
+            return res.status(404).send({ status: 'error', msg: 'Event not found' })
+        }
+
+        const userId = (req as any).user._id
+
+        if(!event.organizer.equals(userId)) {
+            return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
+        }
+
+        event.isCancelled = false
+        await event.save()
+
+        return res.status(200).send({ status: 'ok', msg: 'success' })
+    } catch(error: any) {
+        console.error('Restore Event Error:', error)
+        if (error.name == 'JsonWebTokenError') {
+            return res.status(400).send({ status: 'error', msg: 'Invalid token'})
+        }
+        return res.status(500).send({ status: 'error', msg: 'Internal Error'})
+    }
+})*/
+
+
+// ======================== TOGGLE CANCEL ========================
+router.post('/toggle_cancel', token, async(req: Request, res: Response) => {
+    try {
+        const { eventId } = req.body
+
+        const event: any = await Event.findById(eventId)
+
+        if (!event) {
+            return res.status(404).send({ status: 'error', msg: 'Event not found' })
+        }
+
+        const userId = (req as any).user._id
+
+        if(!event.organizer.equals(userId)){
+            return res.status(403).send({ status: 'error', msg: 'Unauthorized'})
+        }
+
+        event.isCancelled =!event.isCancelled
+        await event.save()
+
+        return res.status(200).send({
+            status: 'ok', msg: event.isCancelled ? 'Event cancelled' : 'Event restored', event
+        })
+    } catch (error: any) {
+        console.log('Toggle Cancel Error:', error)
+        if (error.name == 'JsonWebTokenError') {
+            return res.status(400).send({ status: 'error', msg: 'Invalid token' })
+        }
+        return res.status(500).send({ status: 'error', msg: 'Internal server error' })
+    }
+})
+
+
 // ======================== DELETE EVENTS ========================
 router.post('/delete', token, async(req: Request, res: Response) => {
     try {
@@ -261,7 +388,9 @@ router.post('/delete', token, async(req: Request, res: Response) => {
             return res.status(404).send({ status: 'error', msg: 'Event not found' })
         }
 
-        if (event.organizer.toString() !== (req as any).user._id) {
+        const userId = (req as any).user._id
+
+        if (!event.organizer.equals(userId)) {
             return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
         }
 
@@ -285,4 +414,5 @@ router.post('/delete', token, async(req: Request, res: Response) => {
         return res.status(500).send({ status: 'error', msg: 'Internal server error' })
     }
 })
+
 export default router

@@ -89,7 +89,11 @@ router.post('/saved', token, async (req: Request, res: Response) => {
         const savedEvents = await SavedEvent.find({ user: (req as any).user._id })
         .populate({ path: 'event', populate: { path: 'category organizer' } }).sort({ createdAt: -1 })
 
-        return res.status(200).send({ status: 'ok', msg: 'success', savedEvents })
+        if (savedEvents.length === 0) {
+            return res.status(200).send({ status: 'ok', msg: 'No Events saved' })
+        }
+
+        return res.status(200).send({ status: 'ok', msg: 'success', count: savedEvents.length, savedEvents })
 
     } catch (error: any) {
         console.log(error)
