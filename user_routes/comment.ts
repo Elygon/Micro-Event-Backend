@@ -102,9 +102,12 @@ router.post('/comments', token, async(req: Request, res: Response) => {
         }
 
         const comments = await Comment.find({ event: eventId, parentComment: null })
-        .populate('user').sort({ createdAt: -1 })
+        .populate({
+            path: 'user',
+            select: '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt'
+        }).sort({ createdAt: -1 })
 
-        return res.status(200).send({ status: 'ok', msg: 'success', comments })
+        return res.status(200).send({ status: 'ok', msg: 'success', count: comments.length, comments })
 
     } catch (error: any) {
         console.log(error)
@@ -125,9 +128,12 @@ router.post('/replies', token, async(req: Request, res: Response) => {
             return res.status(400).send({ status: 'error', msg: 'Comment ID is required'})
         }
 
-        const replies = await Comment.find({ parentComment: commentId }).populate('user').sort({ createdAt: -1 })
+        const replies = await Comment.find({ parentComment: commentId }).populate({
+            path: 'user',
+            select: '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt'
+        }).sort({ createdAt: -1 })
 
-        return res.status(200).send({ status: 'ok', msg: 'success', replies })
+        return res.status(200).send({ status: 'ok', msg: 'success', count: replies.length, replies })
 
     } catch (error: any) {
         console.log(error)
@@ -139,7 +145,7 @@ router.post('/replies', token, async(req: Request, res: Response) => {
 })
 
 
-// ======================== UPDATE COMMENT ========================
+// ======================== UPDATE COMMENT/REPLY ========================
 router.post('/update', token, async(req: Request, res: Response) => {
     try {
         const { commentId, text } = req.body
@@ -175,7 +181,7 @@ router.post('/update', token, async(req: Request, res: Response) => {
 })
 
 
-// ======================== DELETE COMMENT ========================
+// ======================== DELETE COMMENT/REPLY ========================
 router.post('/delete', token, async(req: Request, res: Response) => {
     try {
         const { commentId } = req.body
