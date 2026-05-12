@@ -22,6 +22,7 @@ type JoinBody = {
 
 type LoginBody = {
     email: string
+    username: string
     password: string
 }
 
@@ -223,16 +224,23 @@ router.post("/resend_otp", async (req: Request, res: Response) => {
 
 //endpoint to Login
 router.post('/login', async (req: Request, res: Response) => {
-    const { email, password } = req.body as LoginBody
-    if (!email || !password)
+    const { email, username, password } = req.body as LoginBody
+    if ((!email && !username) || !password)
         return res.status(400).send({ status: 'error', msg: 'All fields must be filled' })
 
     try {
+        const orConditions = []
+        if (email) orConditions.push({ email: email.toLowerCase() })
+        if (username) orConditions.push({ username: { $regex: `^${username}$`, $options: 'i' } })
+        
+
+        console.log('Searching for:', JSON.stringify(orConditions, null, 2));
         // Fetch user using email
-        let user: any = await User.findOne({ email }).lean()
+        let user = await User.findOne({ $or: orConditions}).lean()
+
         if (!user)
             return res.status(404).send({
-                status: 'error', msg: 'No account found with the provided email'
+                status: 'error', msg: 'No account found with the provided username or email'
             })
 
         // check if user's account has been verified
@@ -272,23 +280,17 @@ router.post('/login', async (req: Request, res: Response) => {
         // create token
         const token = jwt.sign({
             _id: user._id,
-            email: user.email
+            email: user.email,
+            role: user.role
         }, process.env.jwt_secret as string, { expiresIn: '1d' })
 
         //update user document to online
-        user = await User.findOneAndUpdate({ _id: user._id }, { isOnline: true }, { new: true }).lean()
+        user = await User.findOneAndUpdate({ _id: user._id }, { isOnline: true },
+            { new: true, select: '_id firstname lastname username email interests isVerified isOnline' }
+        ).lean()
 
         //send response
-        res.status(200).send({ status: 'ok', msg: 'success', user: {
-            _id: user._id,
-            firstname: user.firstname,
-            lastname: user.lastname,
-            username: user.username,
-            email: user.email,
-            interests: user.interests,
-            isVerified: user.isVerified,
-            isOnline: user.isOnline
-        }, token })
+        res.status(200).send({ status: 'ok', msg: 'success', user, token })
 
     } catch (error) {
         console.log(error)

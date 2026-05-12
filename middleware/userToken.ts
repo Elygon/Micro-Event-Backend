@@ -39,7 +39,7 @@ const auth = async (req: AuthRequest, res: Response, next: NextFunction) => {
 
     // Verify the token using your secret key from the .env file
     // This decodes the token and gives access to the payload (e.g., the user's ID)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload & { _id: string }
+    const decoded = jwt.verify(token, process.env.jwt_secret as string) as JwtPayload & { _id: string }
 
     // Store the token on the request object (optional but useful later)
     req.token = token;
@@ -55,7 +55,7 @@ const auth = async (req: AuthRequest, res: Response, next: NextFunction) => {
       if (!user) return res.status(401).json({ status: 'error', msg: 'User not found' })
 
       // Attach user info and role ("user") to the request
-      req.user = { ...user, from: 'user' }
+      req.user = { ...user, role: decoded.role, from: 'user' }
 
       // Continue to the next middleware or route
       next()

@@ -6,6 +6,7 @@ export interface ICategory extends Document {
     description?: string
     icon?: string
     colorCode?: string
+    isActive: boolean
     createdAt: Date
     updatedAt: Date
 }
@@ -15,7 +16,8 @@ const categorySchema = new Schema<ICategory>({
     name: { type: String, required: true }, // e.g., 'Tech', 'Social', 'Fitness'
     description: { type: String, default: '' },
     icon: { type: String, default: '' },
-    colorCode: { type: String, default: '' }
+    colorCode: { type: String, default: '' },
+    isActive: { type: Boolean, default: true }
 }, { timestamps: true, collection: 'categories' })
 
 const Category = mongoose.model<ICategory>('Category', categorySchema)

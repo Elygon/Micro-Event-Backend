@@ -9,7 +9,7 @@ import User from '../models/user'
 
 
 // ======================== ALL USERS ========================
-router.post('/all', token, /*AdminOnly,*/ async(req: Request, res: Response) => {
+router.post('/all', token, AdminOnly, async(req: Request, res: Response) => {
     try {
         const { page = 1, limit = 10 } = req.body
         const skip = (page - 1) * limit
@@ -29,7 +29,7 @@ router.post('/all', token, /*AdminOnly,*/ async(req: Request, res: Response) => 
 })
 
 // ======================== PROMOTE TO ADMIN ========================
-router.post('/make_admin', token, async(req: Request, res: Response) => {
+router.post('/make_admin', token, AdminOnly, async(req: Request, res: Response) => {
     try {
         const { userId } = req.body
 
