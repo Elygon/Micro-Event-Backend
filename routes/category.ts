@@ -11,7 +11,7 @@ router.post('/all', token, async (req: Request, res: Response) => {
     try {
         const categories = await Category.find({ isActive: true }).sort({ name: 1 })
 
-        return res.status(200).send({ status: 'ok', msg: 'success', categories })
+        return res.status(200).send({ status: 'ok', msg: 'success', count: categories.length, categories })
     } catch (error: any) {
         console.log(error)
 
@@ -214,7 +214,7 @@ router.post('/delete', token, adminOnly, async(req: Request, res: Response) => {
 
 
 // ======================== TOGGLE STATUS ========================
-router.post('/toggle_status', token, adminOnly, async(req: Request, res: Response) => {
+router.post('/toggle', token, adminOnly, async(req: Request, res: Response) => {
     try {
         const { categoryId } = req.body
         if (!categoryId) {
@@ -231,7 +231,7 @@ router.post('/toggle_status', token, adminOnly, async(req: Request, res: Respons
         await category.save()
 
         return res.status(200).send({
-            status: 'ok', msg: category.isActive ? 'Category deactivated' : 'Category activated', category
+            status: 'ok', msg: category.isActive ? 'Category activated' : 'Category deactivated', category
         })
     } catch (error: any) {
         console.log('Toggle Category Status Error:', error)
@@ -248,7 +248,7 @@ router.post('/inactive', token, adminOnly, async (req: Request, res: Response) =
     try {
         const categories = await Category.find({ isActive: false }).sort({ name: 1 })
 
-        return res.status(200).send({ status: 'ok', msg: 'success', categories })
+        return res.status(200).send({ status: 'ok', msg: 'success', count: categories.length, categories })
     } catch (error: any) {
         console.log(error)
         if (error.name === 'JsonWebTokenError') {
