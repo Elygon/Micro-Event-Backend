@@ -5,7 +5,7 @@ import token from '../middleware/userToken'
 import Event from '../models/event'
 import cloudinary from '../utils/cloudinary'
 import multer from '../utils/multer'
-
+import AdminOnly from '../middleware/adminOnly'
 
 // ======================== TYPES ========================
 type CreateEventBody = {
@@ -418,4 +418,19 @@ router.post('/delete', token, async(req: Request, res: Response) => {
     }
 })
 
+
+// ======================== GET CANCELLED EVENTS ========================
+router.post('/cancelled', token, AdminOnly, async(req: Request, res: Response) => {
+    try {
+        const events = await Event.find({ isCancelled: true }).sort({ name: 1 })
+
+        return res.status(200).send({ status: 'ok', msg: 'success', count: events.length, events })
+    } catch(error: any) {
+        console.error('Cancelled Events Error:', error)
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(400).send({ status: 'error', msg: 'Invalid token' })
+        }
+        return res.status(500).send({ status: 'error', msg: 'Internal Server Error' })
+    }
+})
 export default router
