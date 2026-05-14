@@ -24,6 +24,7 @@ export interface IUser extends Document {
     deletionRequested: boolean
     deletionRequestedAt?: Date
     scheduledDeletionAt?: Date
+    deviceToken?: string
     createdAt: Date
     updatedAt: Date
 }
@@ -59,7 +60,8 @@ const userSchema: Schema<IUser> = new Schema({
     isOnline: { type: Boolean, default: false },
     deletionRequested: { type: Boolean, default: false },
     deletionRequestedAt: { type: Date, default: null },
-    scheduledDeletionAt: { type: Date, default: null }
+    scheduledDeletionAt: { type: Date, default: null },
+    deviceToken: { type: String, default: null }
 }, { timestamps: true, collection: 'users' })
 
 // Query nearby locations
