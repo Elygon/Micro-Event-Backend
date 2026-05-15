@@ -3,6 +3,9 @@ const router = express.Router()
 
 import token from '../middleware/userToken'
 import Event from '../models/event'
+import Notification from '../models/notification'
+import sendPush from '../utils/sendPush'
+import Attendance from '../models/attendance'
 import cloudinary from '../utils/cloudinary'
 import multer from '../utils/multer'
 import AdminOnly from '../middleware/adminOnly'
@@ -276,6 +279,28 @@ router.post('/update', multer.single('image'), token, async (req: Request, res: 
         }
 
         await event.save()
+        
+        const attendees = await Attendance.find({ event: event._id, status: 'going', })
+        .populate('user')
+
+        for (const attendee of attendees as any[]) {
+            await Notification.create({
+                user: attendee.user._id,
+                type: 'event_update',
+                title: 'Event Updated',
+                msg: `${event.title} has been updated`,
+                event: event._id,
+                fromUser: userId
+            })
+
+            if (attendee.user.deviceToken) {
+                await sendPush(
+                    attendee.user.deviceToken,
+                    'Event Updated',
+                    `${event.title} has new changes`
+                )
+            }
+        }
 
         return res.status(200).send({ status: 'ok', msg: 'success', event })
     } catch (error: any) {
@@ -367,6 +392,51 @@ router.post('/toggle_cancel', token, async(req: Request, res: Response) => {
 
         event.isCancelled =!event.isCancelled
         await event.save()
+
+        const attendees = await Attendance.find({ event: event._id, status: 'going' }).populate('user')
+
+        if (event.isCancelled) {
+            // Event Cancelled
+            for (const attendee of attendees as any[]) {
+                await Notification.create({
+                    user: attendee.user._id,
+                    type: 'event_cancelled',
+                    title: 'Event Cancelled',
+                    msg: `${event.title} has been cancelled`,
+                    event: event._id,
+                    fromUser: userId
+                })
+
+                if (attendee.user.deviceToken) {
+                    await sendPush(
+                        attendee.user.deviceToken,
+                        'Event Cancelled',
+                        `${event.title} has been cancelled`
+                    )
+                }
+            }
+        } else {
+            //Event Restored
+            for (const attendee of attendees as any[]) {
+                await Notification.create({
+                    user: attendee.user._id,
+                    type: 'event_update',
+                    title: 'Event Restored',
+                    msg: `${event.title} is back on schedule`,
+                    event: event._id,
+                    fromUser: userId
+                })
+
+                if (attendee.user.deviceToken) {
+                    await sendPush(
+                        attendee.user.deviceToken,
+                        'Event Restored',
+                        `${event.title} is back on schedule`
+                    )
+                }
+            }
+        }
+
 
         return res.status(200).send({
             status: 'ok', msg: event.isCancelled ? 'Event cancelled' : 'Event restored', event

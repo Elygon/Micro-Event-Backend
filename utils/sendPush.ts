@@ -9,7 +9,7 @@ const sendPush = async (deviceToken: string, title: string, body: string) => {
 
         console.log('Push notification sent')
     } catch (error) {
-        console.error(error)
+        console.error('Push notification error:', error)
     }
 }
 

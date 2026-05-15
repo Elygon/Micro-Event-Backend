@@ -4,6 +4,7 @@ const router = express.Router()
 import token from '../middleware/userToken'
 import adminOnly from '../middleware/adminOnly'
 import Notification from '../models/notification'
+import User from '../models/user'
 
 // ======================== GET MY NOTIFICATIONS ========================
 router.post('/all', token, async(req: Request, res: Response) => {
@@ -187,4 +188,24 @@ router.post('/system', token, adminOnly, async(req: Request, res: Response) => {
     }
 })
 
+
+// ======================== SAVE DEVICE TOKEN ========================
+router.post('/save_token', token, async(req: Request, res: Response) => {
+    try {
+        const { deviceToken } = req.body
+        if (!deviceToken) {
+            return res.status(400).send({ status: 'error', msg: 'Device token is required' })
+        }
+
+        await User.findByIdAndUpdate( (req as any).user._id, { deviceToken } )
+
+        return res.status(200).send({ status: 'ok', msg: 'Device token saved' })
+    } catch (error: any) {
+        console.error('Device Token Error:', error)
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(400).send({ status: 'error', msg: 'Invalid token' })
+        }
+        return res.status(500).send({ status: 'error', msg: 'Internal Server Error' })
+    }
+})
 export default router
