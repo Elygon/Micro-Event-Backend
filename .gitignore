@@ -11,3 +11,5 @@ check.ts
 isActive.ts
 serviceAccountKey.json
 utils/seedCategories.ts
+testPush.ts
+test-fcm.html

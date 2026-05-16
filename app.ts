@@ -55,6 +55,9 @@ app.use('/users', users)
 import notification from './routes/notification'
 app.use('/notification', notification)
 
+// import testPush from './testPush'
+// app.use('/testPush', testPush)
+
 // server
 const port = process.env.PORT || 4600
 app.listen(port, () => {
