@@ -10,3 +10,4 @@ addRole.ts
 check.ts
 isActive.ts
 serviceAccountKey.json
+utils/seedCategories.ts

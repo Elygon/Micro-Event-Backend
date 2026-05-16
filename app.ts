@@ -4,7 +4,7 @@ const app: Application = express()
 import dotenv from 'dotenv'
 dotenv.config()
 
-import { seedCategories } from "./utils/seedCategories"
+//import { seedCategories } from "./utils/seedCategories"
 import initCron from './utils/cron'
 
 // middlewares
@@ -23,7 +23,7 @@ con.on('open', error => {
     }
 })
 
-seedCategories()
+//seedCategories()
 // Initialize Cron Jobs
 initCron()
 
@@ -51,6 +51,9 @@ app.use('/category', category)
 
 import users from './routes/users'
 app.use('/users', users)
+
+import notification from './routes/notification'
+app.use('/notification', notification)
 
 // server
 const port = process.env.PORT || 4600

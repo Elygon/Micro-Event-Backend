@@ -6,6 +6,14 @@ interface IPoint {
     coordinates: [number, number] // [longitude, latitude]
 }
 
+
+// Interface for Event reminder
+interface IReminderSent {
+    fortyEightHour: boolean
+    twentyFourHour: boolean
+    oneHour: boolean
+}
+
 // Interface for Event document
 export interface IEvent extends Document {
     title: string
@@ -22,6 +30,7 @@ export interface IEvent extends Document {
     imgUrl?: string
     isPublic: boolean
     isCancelled: boolean
+    reminderSent: IReminderSent
     createdAt: Date
     updatedAt: Date
 }
@@ -34,7 +43,7 @@ const pointSchema = new Schema<IPoint>({
 
 // Event Schema
 const eventSchema = new Schema<IEvent>({
-    title: String, //e.g Saturday Morning Coffe & Code
+    title: String, //e.g Saturday Morning Coffee & Code
     description: String,
     organizer: {
         type: Schema.Types.ObjectId, ref: 'User', // must match your user model name
@@ -53,7 +62,15 @@ const eventSchema = new Schema<IEvent>({
     imgId: String,
     imgUrl: String,
     isPublic: { type: Boolean, default: true },
-    attendeesCount: { type: Number, default: 0 }
+    attendeesCount: { type: Number, default: 0 },
+    reminderSent: {
+        type: {
+            fortyEightHour: { type: Boolean, default: false },
+            twentyFourHour: { type: Boolean, default: false },
+            oneHour: { type: Boolean, default: false }
+        },
+        default: () => ({})
+    }
 }, { timestamps: true, collection: 'events' })
 
 // Important for $near queries
