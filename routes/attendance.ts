@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express'
 const router = express.Router()
 
 import Attendance from '../models/attendance'
+import Notification from '../models/notification'
+import sendPush from '../utils/sendPush'
 import token from '../middleware/userToken'
 import Event from '../models/event'
 //import User from '../models/user'
@@ -21,7 +23,7 @@ router.post('/attend', token, async(req: Request, res: Response) => {
         }
 
         // Check if event exists
-        const event: any = await Event.findById(eventId)
+        const event: any = await Event.findById(eventId).populate('organizer', '_id deviceToken')
 
         if (!event) {
             return res.status(404).send({ status: 'error', msg: 'Event not found' })
@@ -51,6 +53,26 @@ router.post('/attend', token, async(req: Request, res: Response) => {
             event.attendeesCount += 1
 
             await event.save()
+
+            // Notify organizer only when user selects 'going'
+            if (event.organizer?._id.toString() !== (req as any).user._id.toString()) {
+                await Notification.create({
+                    user: event.organizer._id,
+                    type: 'new_attendee',
+                    title: 'New Attendee',
+                    msg: `${(req as any).user.username} is attending ${event.title}`,
+                    event: event._id,
+                    fromUser: (req as any).user._id
+                })
+
+                if (event.organizer.deviceToken) {
+                    await sendPush(
+                        event.organizer.deviceToken,
+                        'New Attendee',
+                        `${(req as any).user.username} is attending your event`
+                    )
+                }
+            }
         }
 
         return res.status(201).send({ status: 'success', attendance })
@@ -80,7 +102,7 @@ router.post('/update', token, async(req: Request, res: Response) => {
         }
 
         // Check if event exists
-        const event: any = await Event.findById(eventId)
+        const event: any = await Event.findById(eventId).populate('organizer', '_id deviceToken')
 
         if (!event) {
             return res.status(404).send({ status: 'error', msg: 'Event not found' })
@@ -98,20 +120,22 @@ router.post('/update', token, async(req: Request, res: Response) => {
             return res.status(400).send({ status: 'error', msg: 'Attendance status already set' })
         }
 
+        const previousStatus = attendance.status
+
         // Capacity enforcement
-        if ( attendance.status !== 'going' && 
+        if (previousStatus !== 'going' && 
             status === 'going' && event.capacity && event.attendeesCount >= event.capacity
         ) {
             return res.status(400).send({ status: 'error', msg: 'Event is already at full capacity' })
         }
 
         // Increment attendees count
-        if ( attendance.status !== 'going' && status === 'going' ) {
+        if ( previousStatus !== 'going' && status === 'going' ) {
             event.attendeesCount += 1
         }
 
         // Decrement attendees count
-        if (attendance.status === 'going' && status !== 'going') {
+        if (previousStatus === 'going' && status !== 'going') {
             event.attendeesCount -= 1
         }
         
@@ -120,6 +144,28 @@ router.post('/update', token, async(req: Request, res: Response) => {
 
         await attendance.save()
         await event.save()
+
+        // Notify organizer only when user changes to 'going'
+        if (previousStatus !== 'going' && status === 'going' && 
+            event.organizer?._id.toString() !== (req as any).user._id.toString()
+        )  {
+            await Notification.create({
+                user: event.organizer._id,
+                type: 'new_attendee',
+                title: 'New Attendee',
+                msg: `${(req as any).user.username} is now attending ${event.title}`,
+                event: event._id,
+                fromUser: (req as any).user._id
+            })
+
+            if (event.organizer.deviceToken) {
+                await sendPush(
+                    event.organizer.deviceToken,
+                    'New Attendee',
+                    `${(req as any).user.username} is now attending your event`
+                )
+            }
+        }
 
         return res.status(200).send({ status: 'success', attendance })
 

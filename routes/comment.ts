@@ -2,8 +2,10 @@ import express, { Request, Response } from 'express'
 const router = express.Router()
 
 import Comment from '../models/comment'
+import Notification from '../models/notification'
 import token from '../middleware/userToken'
 import Event from '../models/event'
+import sendPush from '../utils/sendPush'
 
 
 // ======================== COMMENT ON AN EVENT ========================
@@ -28,6 +30,28 @@ router.post('/comment', token, async(req: Request, res: Response) => {
         }
 
         const comment = await Comment.create({ event: eventId, user: (req as any).user._id, text: text.trim() })
+
+        await event.populate('organizer', '_id deviceToken')
+
+        // Notify organizer of new comments on their event
+        if (event.organizer?._id.toString() !== (req as any).user._id.toString() !== (req as any).user._id.toString()) {
+            await Notification.create({
+                user: event.organizer._id,
+                type: 'comment',
+                title: 'New Comment',
+                msg: `${(req  as any).user.username} commented on ${event.title}`,
+                event: event._id,
+                fromUser: (req as any).user._id
+            })
+
+            if (event.organizer.deviceToken) {
+                await sendPush(
+                    event.organizer.deviceToken,
+                    'New Comment',
+                    `${(req as any).user.username} commented on your event`
+                )
+            }
+        }
 
         return res.status(201).send({ status: 'ok', msg: 'success', comment })
 
@@ -80,6 +104,27 @@ router.post('/reply', token, async(req: Request, res: Response) => {
             event: eventId, user: (req as any).user._id, text: text.trim(), parentComment: parentCommentId 
         })
 
+        await parentComment.populate('user', '_id deviceToken')
+
+        if (parentComment?.user?._id.toString() !== (req as any).user._id.toString()) {
+            await Notification.create({
+                user: parentComment.user._id,
+                type: 'comment',
+                title: 'New Reply',
+                msg: `${(req as any).user.username} replied to your comment`,
+                event: eventId,
+                fromUser: (req as any).user._id
+            })
+
+            if (parentComment.user.deviceToken) {
+                await sendPush(
+                    parentComment.user.deviceToken,
+                    'New Reply',
+                    `${(req as any).user.username} replied to your comment`
+                )
+            }
+        }
+
         return res.status(201).send({ status: 'ok', msg: 'success', reply })
 
     } catch (error: any) {
@@ -95,19 +140,25 @@ router.post('/reply', token, async(req: Request, res: Response) => {
 // ======================== VIEW EVENT COMMENTS ========================
 router.post('/comments', token, async(req: Request, res: Response) => {
     try {
+        const { page = 1, limit = 20 } = req.body
+        const skip = (page - 1) * limit
         const { eventId } = req.body
 
         if ( !eventId ) {
             return res.status(400).send({ status: 'error', msg: 'Event ID is required'})
         }
 
+        const total = await Comment.countDocuments({ event: eventId, parentComment: null })
+
         const comments = await Comment.find({ event: eventId, parentComment: null })
         .populate({
             path: 'user',
             select: '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt'
-        }).sort({ createdAt: -1 })
+        }).sort({ createdAt: -1 }).skip(skip).limit(limit)
 
-        return res.status(200).send({ status: 'ok', msg: 'success', count: comments.length, comments })
+        return res.status(200).send({ status: 'ok', msg: 'success', page, limit, total,
+            totalPages: Math.ceil(total / limit), count: comments.length, comments
+        })
 
     } catch (error: any) {
         console.log(error)
@@ -122,18 +173,24 @@ router.post('/comments', token, async(req: Request, res: Response) => {
 // ======================== VIEW COMMENT REPLIES ========================
 router.post('/replies', token, async(req: Request, res: Response) => {
     try {
+        const { page = 1, limit = 10 } = req.body
+        const skip = (page -1) * 1
         const { commentId } = req.body
 
         if ( !commentId ) {
             return res.status(400).send({ status: 'error', msg: 'Comment ID is required'})
         }
 
+        const total = await Comment.countDocuments({ parentComment: commentId })
+
         const replies = await Comment.find({ parentComment: commentId }).populate({
             path: 'user',
             select: '-bio -interests -email -location -password -isVerified -profile_img_id -isOnline -createdAt -updatedAt -__v -deletionRequested -deletionRequestedAt -scheduledDeletionAt -verificationOTP -otpExpiresAt'
-        }).sort({ createdAt: -1 })
+        }).sort({ createdAt: -1 }).skip(skip).limit(limit)
 
-        return res.status(200).send({ status: 'ok', msg: 'success', count: replies.length, replies })
+        return res.status(200).send({ status: 'ok', msg: 'success', page, limit, total,
+            totalPages: Math.ceil(total / limit), count: replies.length, replies 
+        })
 
     } catch (error: any) {
         console.log(error)
@@ -161,7 +218,7 @@ router.post('/update', token, async(req: Request, res: Response) => {
         }
 
         // Ensure the user owns the comment
-        if (comment.user.toString() !== (req as any).user._id) {
+        if (comment.user.toString() !== (req as any).user._id.toString()) {
             return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
         }
 
@@ -197,7 +254,7 @@ router.post('/delete', token, async(req: Request, res: Response) => {
         }
 
         // Ensure user owns the comment
-        if (comment.user.toString() !== (req as any).user._id) {
+        if (comment.user.toString() !== (req as any).user._id.toString()) {
             return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
         }
 
