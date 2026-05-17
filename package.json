@@ -1,9 +1,11 @@
 {
   "name": "micro-event-backend",
   "version": "1.0.0",
-  "main": "app.ts",
+  "main": "dist/app.js",
+  "type": "module",
   "scripts": {
-    "start": "node dist/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn --transpile-only app.ts"
   },
   "keywords": [],
