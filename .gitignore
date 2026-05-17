@@ -13,3 +13,6 @@ serviceAccountKey.json
 utils/seedCategories.ts
 testPush.ts
 test-fcm.html
+testClient.ts
+firebase-messaging-sw.js
+devTools.ts
