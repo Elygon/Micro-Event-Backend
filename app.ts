@@ -52,6 +52,9 @@ app.use('/category', category)
 import users from './routes/users'
 app.use('/users', users)
 
+import dashboard from './routes/dashboard'
+app.use('/dashboard', dashboard)
+
 import notification from './routes/notification'
 app.use('/notification', notification)
 
