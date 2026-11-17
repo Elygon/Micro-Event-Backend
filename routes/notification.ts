@@ -90,7 +90,7 @@ router.post('/read_all', token, async(req: Request, res: Response) => {
 router.post('/delete', token, async(req: Request, res: Response) => {
     try {
         const { notificationId } = req.body
-        if (notificationId) {
+        if (!notificationId) {
             return res.status(400).send({ status: 'error', msg: 'Notification ID is required' })
         }
 
@@ -103,7 +103,7 @@ router.post('/delete', token, async(req: Request, res: Response) => {
             return res.status(403).send({ status: 'error', msg: 'Unauthorized' })
         }
 
-        await Notification.deleteOne()
+        await notification.deleteOne()
         
         return res.status(200).send({ status: 'ok', msg: 'success' })
     } catch (error: any) {
